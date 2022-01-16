@@ -1,2 +1,2 @@
 # GridFlippleLib
-Implementation of the game of life rules in Razor class library
+Implementation of the game of life rules in Razor class library component
