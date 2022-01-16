@@ -1,0 +1,306 @@
+﻿@using System.Linq
+@using System.Timers
+
+<h2>Blaze of Life</h2>
+<ul>
+    <li>Any live cell with two or three live neighbours survives</li>
+    <li>Any dead cell with three live neighbours becomes a live cell</li>
+    <li>All other live cells die in the next generation. Similarly, all other dead cells stay dead</li>
+</ul>
+<hr />
+<div class="gridground">
+    @for (int i = 0; i < Columns; i++)
+    {
+        var col = i;
+        <div class="grid-col">
+            @for (int j = 0; j < Rows; j++)
+            {
+                var row = j;
+
+                <div title="@row, @col" class="@GetCssXY(row, col)" @onclick="(() => ClickTile(row, col))"></div>
+            }
+        </div>
+    }
+</div>
+<button type="button" onclick="@(() => Step())">Step</button>
+<hr />
+<label>Speed @TickSpeed</label>
+<input type="range" step="10" max="1500" min="80" @bind-value="TickSpeed" />
+<button type="button" onclick="@(() => StartStop())">Start/Stop</button>
+<hr />
+<button type="button" onclick="@(() => ResetGrid())">Clear</button>
+
+@code {
+    [Parameter]
+    public int Rows { get; set; }
+    [Parameter]
+    public int Columns { get; set; }
+    [Parameter]
+    public double TickSpeed { get; set; }
+    [Parameter]
+    public int GridSize { get; set; }
+
+    private bool[,] _InternalGridState { get; set; } = new bool[1, 1];
+
+    private int lastStepChanges = 0;
+
+    private Timer tickTimer = new Timer(1);
+
+    private bool processing = false;
+
+    private void ResetGrid()
+    {
+        for (int col = 0; col < Columns; col++)
+        {
+            for (int row = 0; row < Rows; row++)
+            {
+                _InternalGridState[row, col] = false;
+            }
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void StartStop()
+    {
+        if (tickTimer.Enabled)
+        {
+            tickTimer.Enabled = false;
+        }
+        else
+        {
+            tickTimer.Interval = TickSpeed;
+            tickTimer.Enabled = true;
+        }
+    }
+
+    private void Tick(Object? Source, ElapsedEventArgs args)
+    {
+        if(!processing)
+            Step();
+
+        if (lastStepChanges <= 0)
+        {
+            StartStop();
+        }
+    }
+
+    private void Step()
+    {
+        processing = true;
+        bool[,] newState = new bool[Rows, Columns];
+
+        for (int r = 0; r < Rows; r++)
+        {
+            for (int c = 0; c < Columns; c++)
+            {
+                newState[r,c] = ProcessBlock(r, c);
+            }
+        }
+
+        lastStepChanges = CountArrayDiffs(_InternalGridState, newState);
+
+        _InternalGridState = newState;
+
+        if (lastStepChanges > 0)
+            InvokeAsync(StateHasChanged);
+
+        processing = false;
+    }
+
+    private int CountArrayDiffs(bool[,] A1, bool[,] A2)
+    {
+        int result = 0;
+
+        for (int row = 0; row < Rows - 1; row ++)
+        {
+            for (int col = 0; col < Columns - 1; col ++)
+            {
+                if (A1[row,col] == A2[row, col])
+                {
+                    result++;  
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private bool ProcessBlock(int row, int col)
+    {
+        int LiveNeighbours = CountLiveNeighbours(row, col);
+
+        bool blockstate = GetBlockState(row, col);
+
+        if (blockstate)
+        {
+            if ((LiveNeighbours < 2) || (LiveNeighbours > 3))
+                blockstate = false;
+        }
+        else
+        {
+            if (LiveNeighbours == 3)
+                blockstate = true;
+        }
+
+        return blockstate;
+    }
+
+    private int CountLiveNeighbours(int row, int col)
+    {
+        int result = 0;
+
+        //u
+        if (GetBlockStateAbove(row, col))
+            result++;
+        //l
+        if (GetBlockStateLeft(row, col))
+            result++;
+        //r
+        if (GetBlockStateRight(row, col))
+            result++;
+        //b
+        if (GetBlockStateBelow(row, col))
+            result++;
+
+        //bl
+        if (GetBlockStateBelowLeft(row, col))
+            result++;
+        //br
+        if (GetBlockStateBelowRight(row, col))
+            result++;
+
+        //ul
+        if (GetBlockStateAboveLeft(row, col))
+            result++;
+        //ur
+        if (GetBlockStateAboveRight(row, col))
+            result++;
+
+        return result;
+    }
+
+    private int resolveColumn(int col)
+    {
+        int result = col;
+
+        if (col < 0)
+            result = Columns - 1;
+        else if (col > Columns - 1)
+            result = 0;
+
+        return result;
+    }
+
+    private int resolveRow(int row)
+    {
+        int result = row;
+
+        if (row < 0)
+            result = Rows - 1;
+        else if (row > Rows - 1)
+            result = 0;
+
+        return result;
+    }
+
+    private void SetBlockState(int row, int col, bool val)
+    {
+        _InternalGridState[row, col] = val;
+    }
+
+    private bool GetBlockState(int row, int col)
+    {
+        return _InternalGridState[resolveRow(row), resolveColumn(col)];
+    }
+
+    private bool GetBlockStateAbove(int row, int col)
+    {
+        bool result = GetBlockState(row - 1, col);
+
+        return result;
+    }
+
+    private bool GetBlockStateAboveLeft(int row, int col)
+    {
+        bool result = GetBlockState(row - 1, col - 1);
+
+        return result;
+    }
+
+    private bool GetBlockStateAboveRight(int row, int col)
+    {
+        bool result = GetBlockState(row - 1, col + 1);
+
+        return result;
+    }
+
+    private bool GetBlockStateBelow(int row, int col)
+    {
+        bool result = GetBlockState(row + 1, col);
+
+        return result;
+    }
+
+    private bool GetBlockStateBelowLeft(int row, int col)
+    {
+        bool result = GetBlockState(row + 1, col - 1);
+
+        return result;
+    }
+
+    private bool GetBlockStateBelowRight(int row, int col)
+    {
+        bool result = GetBlockState(row + 1, col + 1);
+
+        return result;
+    }
+
+    private bool GetBlockStateLeft(int row, int col)
+    {
+        bool result = GetBlockState(row, col - 1);
+
+        return result;
+    }
+
+    private bool GetBlockStateRight(int row, int col)
+    {
+        bool result = GetBlockState(row, col + 1);
+
+        return result;
+    }
+
+    protected override void OnInitialized()
+    {
+        _InternalGridState = new bool[Rows, Columns];
+        tickTimer.Elapsed += Tick;
+
+        ResetGrid();
+    }
+
+    private string GetCssXY(int row, int col)
+    {
+        string result = "block ";
+
+        if (_InternalGridState[row, col])
+        {
+            result += "block-activated";
+        }
+        else
+        {
+            result += "block-deactivated";
+        }
+
+        return result;
+    }
+
+    private void Clear()
+    {
+        ResetGrid();
+    }
+
+    private void ClickTile(int row, int col)
+    {
+        _InternalGridState[row,col] = !_InternalGridState[row,col];
+    }
+}

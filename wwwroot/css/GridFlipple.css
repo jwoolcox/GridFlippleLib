@@ -1,0 +1,24 @@
+﻿.grid-col {
+    display: inline-grid;
+}
+
+.grid-row > * {
+    display: inline-block;
+    padding: 0px;
+}
+
+.block {
+    width:18px;
+    height:18px;
+    border-style: outset;
+    border-width: 2px;
+    transition: background-color 0.23s;
+}
+
+.block-activated {
+    background-color: chartreuse;
+}
+
+.block-deactivated {
+    background-color: black;
+}
